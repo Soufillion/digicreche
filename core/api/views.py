@@ -3,13 +3,17 @@ import stripe
 from core.api.permissions import IsManager
 from core.api.serializers import (PaymentMethodSerializer, PlanSerializer,
                                   SubscriptionSerializer)
-from django.conf import settings
 from django_countries import countries
+from django.conf import settings
+from django.utils import timezone
+from datetime import timedelta
+from djstripe.models import Customer, Subscription
 from rest_framework import generics, status
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from schools.models import School
+import time
 
 
 class ListCountries(APIView):
@@ -35,82 +39,61 @@ class CreateCustomerSubscription(APIView):
 
     def post(self, request):
         try:
-            # parse request, extract details, and verify assumptions
             user = request.user
-            school = School.objects.get(
-                pk=request.data.get('schoolId'))
+            school = School.objects.get(pk=request.data.get('schoolId'))
             email = request.data.get('email')
             assert user.email == email
             assert school.manager == user
-            payment_method = request.data.get('paymentMethodId')
-            priceId = request.data.get('priceId')
-            stripe.api_key = settings.STRIPE_TEST_SECRET_KEY
 
-            # first sync payment method to local DB to workaround
-            # https://github.com/dj-stripe/dj-stripe/issues/1125
-            payment_method_obj = stripe.PaymentMethod.retrieve(payment_method)
-            sm.PaymentMethod.sync_from_stripe_data(payment_method_obj)
+            # Disable all Stripe/payment logic
+            # Option 1: Just create a dummy subscription object in your DB
+            # Option 2: If you want to keep using djstripe, create a local Subscription
 
-            # create customer objects
-            # This creates a new Customer in stripe and attaches the default
-            # PaymentMethod in one API call.
-            if user.customer is None:
-                customer = stripe.Customer.create(
-                    payment_method=payment_method,
-                    email=email,
-                    invoice_settings={
-                        'default_payment_method': payment_method,
-                    },
-                )
-            else:
-                stripe.PaymentMethod.attach(
-                    payment_method,
-                    customer=user.customer.id,
-                )
-                customer = stripe.Customer.retrieve(user.customer.id)
+            # Example: Create a dummy subscription object (adjust as needed)
+            from djstripe.models import Subscription
 
-            djstripe_customer = sm.Customer.sync_from_stripe_data(
-                customer)
-
+            # Create a dummy subscription if not exists
             if school.subscription is None:
-                # create subscription
-                subscription = stripe.Subscription.create(
-                    customer=customer.id,
-                    items=[
-                        {
-                            'price': priceId,
-                        },
-                    ],
-                    expand=['latest_invoice.payment_intent'],
-                    metadata={
-                        'school': school.id,
-                    },
-                    trial_period_days=14,
+                now = timezone.now()
+                customer, _ = Customer.objects.get_or_create(
+                    subscriber=user,
+                    defaults={
+                        "email": user.email,
+                        "currency": "usd",
+                        "livemode": False,
+                    }
                 )
-                djstripe_subscription = sm.Subscription.sync_from_stripe_data(
-                    subscription)
-
-                # associate subscription awith the school
-                school.subscription = djstripe_subscription
+                # Use timestamp for uniqueness
+                dummy_id = f"dummy_sub_{school.id}_{int(time.time())}"
+                subscription, created = Subscription.objects.get_or_create(
+                    id=dummy_id,
+                    defaults={
+                        "customer": customer,
+                        "status": "active",
+                        "metadata": {"school": school.id},
+                        "trial_end": None,
+                        "start_date": now,
+                        "current_period_start": now,
+                        "current_period_end": now + timedelta(days=30),
+                        "cancel_at_period_end": False,
+                        "ended_at": None,
+                        "canceled_at": None,
+                        "plan": None,
+                        "quantity": 1,
+                    }
+                )
+                school.subscription = subscription
                 school.save()
             else:
-                subscription = stripe.Subscription.modify(
-                    school.subscription.id,
-                    billing_cycle_anchor='now',
-                    proration_behavior='create_prorations',
-                    expand=['latest_invoice.payment_intent'],
-                    default_payment_method=payment_method,
-                )
-                sm.Subscription.sync_from_stripe_data(subscription)
+                subscription = school.subscription
 
-            # associate customer awith the user
-            user.customer = djstripe_customer
+            # Optionally, associate a dummy customer
+            user.customer = None
             user.save()
 
-            # return information back to the front end
             data = {
-                'customer': customer,
-                'subscription': subscription
+                'customer': None,
+                'subscription': SubscriptionSerializer(subscription).data
             }
             return Response(data, status=status.HTTP_200_OK)
         except Exception as e:
