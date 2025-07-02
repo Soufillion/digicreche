@@ -1,0 +1,34 @@
+{
+  "status": "done",
+  "assets": {
+    "bundle.css": {
+      "name": "bundle.css",
+      "path": "/home/pinco/Desktop/MS4/digicreche/frontend/dist/bundle.css",
+      "publicPath": "http://0.0.0.0:8080/bundle.css"
+    },
+    "bundle.js": {
+      "name": "bundle.js",
+      "path": "/home/pinco/Desktop/MS4/digicreche/frontend/dist/bundle.js",
+      "publicPath": "http://0.0.0.0:8080/bundle.js"
+    },
+    "bundle.js.map": {
+      "name": "bundle.js.map",
+      "path": "/home/pinco/Desktop/MS4/digicreche/frontend/dist/bundle.js.map",
+      "publicPath": "http://0.0.0.0:8080/bundle.js.map"
+    },
+    "index.html": {
+      "name": "index.html",
+      "path": "/home/pinco/Desktop/MS4/digicreche/frontend/dist/index.html",
+      "publicPath": "http://0.0.0.0:8080/index.html"
+    }
+  },
+  "chunks": {
+    "app": [
+      "bundle.css",
+      "bundle.js",
+      "bundle.css.map",
+      "bundle.js.map"
+    ]
+  },
+  "publicPath": "http://0.0.0.0:8080/"
+}

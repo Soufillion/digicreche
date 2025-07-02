@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block style %}
+    <link rel="stylesheet" href="{% static 'bundle.css' %}">
+{% endblock style %}
+
+{% block content %}
+
+    <noscript>
+        <strong>DigiCreche requires JavaScript for functioning. Please enable it to continue.</strong>
+    </noscript>
+    <div id="app"></div>
+
+{% endblock content %}
+
+{% block script %}
+    <script src="{% static 'bundle.js' %}"></script>
+{% endblock script %}
